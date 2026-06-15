@@ -3,10 +3,10 @@
 import type { GameAnalysis, MoveClassification } from '@/types';
 
 function accuracyColor(acc: number): string {
-  if (acc >= 90) return 'text-green-400';
-  if (acc >= 75) return 'text-blue-400';
-  if (acc >= 60) return 'text-yellow-400';
-  return 'text-red-400';
+  if (acc >= 90) return '#70e870';
+  if (acc >= 75) return '#60b8f8';
+  if (acc >= 60) return '#f8c840';
+  return '#f87060';
 }
 
 function countClassifications(moves: GameAnalysis['moves'], color: 'w' | 'b') {
@@ -18,49 +18,49 @@ function countClassifications(moves: GameAnalysis['moves'], color: 'w' | 'b') {
   return counts;
 }
 
-interface Props {
-  analysis: GameAnalysis;
-}
+const ROWS: Array<{ label: string; key: MoveClassification; color: string }> = [
+  { label: 'Best',       key: 'best',       color: '#70e870' },
+  { label: 'Excellent',  key: 'excellent',  color: '#a0e8a0' },
+  { label: 'Good',       key: 'good',       color: '#70b8f8' },
+  { label: 'Inaccuracy', key: 'inaccuracy', color: '#f8c840' },
+  { label: 'Mistake',    key: 'mistake',    color: '#f89840' },
+  { label: 'Blunder',    key: 'blunder',    color: '#f85040' },
+];
 
-export default function AccuracyCard({ analysis }: Props) {
-  const whiteCounts = countClassifications(analysis.moves, 'w');
-  const blackCounts = countClassifications(analysis.moves, 'b');
-
-  const rows: Array<{ label: string; key: MoveClassification; color: string }> = [
-    { label: 'Best', key: 'best', color: 'text-green-400' },
-    { label: 'Excellent', key: 'excellent', color: 'text-green-300' },
-    { label: 'Good', key: 'good', color: 'text-blue-300' },
-    { label: 'Inaccuracy', key: 'inaccuracy', color: 'text-yellow-400' },
-    { label: 'Mistake', key: 'mistake', color: 'text-orange-400' },
-    { label: 'Blunder', key: 'blunder', color: 'text-red-500' },
-  ];
+export default function AccuracyCard({ analysis }: { analysis: GameAnalysis }) {
+  const wc = countClassifications(analysis.moves, 'w');
+  const bc = countClassifications(analysis.moves, 'b');
 
   return (
-    <div className="bg-slate-800/50 rounded-lg p-4 text-sm">
+    <div className="card p-4 text-sm">
       <div className="grid grid-cols-3 gap-2 mb-3 text-center">
         <div>
-          <div className={`text-2xl font-bold ${accuracyColor(analysis.whiteAccuracy)}`}>
+          <div className="text-2xl font-bold" style={{ color: accuracyColor(analysis.whiteAccuracy) }}>
             {analysis.whiteAccuracy.toFixed(1)}%
           </div>
-          <div className="text-slate-400 text-xs mt-0.5">{analysis.white} (W)</div>
+          <div className="text-xs mt-0.5 truncate" style={{ color: 'var(--muted)' }}>
+            {analysis.white}
+          </div>
         </div>
         <div className="flex items-center justify-center">
-          <div className="text-slate-500 text-xs">Accuracy</div>
+          <span className="text-xs" style={{ color: 'var(--muted)' }}>Accuracy</span>
         </div>
         <div>
-          <div className={`text-2xl font-bold ${accuracyColor(analysis.blackAccuracy)}`}>
+          <div className="text-2xl font-bold" style={{ color: accuracyColor(analysis.blackAccuracy) }}>
             {analysis.blackAccuracy.toFixed(1)}%
           </div>
-          <div className="text-slate-400 text-xs mt-0.5">{analysis.black} (B)</div>
+          <div className="text-xs mt-0.5 truncate" style={{ color: 'var(--muted)' }}>
+            {analysis.black}
+          </div>
         </div>
       </div>
 
-      <div className="border-t border-slate-700 pt-3 space-y-1">
-        {rows.map(({ label, key, color }) => (
+      <div className="pt-3 space-y-1" style={{ borderTop: '1px solid var(--border)' }}>
+        {ROWS.map(({ label, key, color }) => (
           <div key={key} className="grid grid-cols-3 items-center text-center">
-            <span className="text-slate-300">{whiteCounts[key] ?? 0}</span>
-            <span className={`${color} text-xs`}>{label}</span>
-            <span className="text-slate-300">{blackCounts[key] ?? 0}</span>
+            <span style={{ color: 'var(--text)' }}>{wc[key] ?? 0}</span>
+            <span className="text-xs" style={{ color }}>{label}</span>
+            <span style={{ color: 'var(--text)' }}>{bc[key] ?? 0}</span>
           </div>
         ))}
       </div>

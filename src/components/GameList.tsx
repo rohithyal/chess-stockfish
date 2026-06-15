@@ -11,22 +11,23 @@ interface Props {
 
 function resultBadge(result: string) {
   const label = getResultLabel(result);
-  const color =
+  const styles =
     label === 'Win'
-      ? 'bg-green-900/60 text-green-300 border-green-700'
+      ? { background: 'rgba(60,140,60,0.25)', border: '1px solid #3a7a3a', color: '#90d890' }
       : label === 'Loss'
-      ? 'bg-red-900/60 text-red-300 border-red-700'
-      : 'bg-slate-700/60 text-slate-300 border-slate-600';
+      ? { background: 'rgba(160,50,20,0.25)', border: '1px solid #7a3020', color: '#f8a080' }
+      : { background: 'rgba(80,60,20,0.35)', border: '1px solid var(--border)', color: 'var(--muted)' };
   return (
-    <span className={`text-xs px-2 py-0.5 rounded border ${color}`}>{label}</span>
+    <span className="text-xs px-2 py-0.5 rounded font-medium" style={styles}>
+      {label}
+    </span>
   );
 }
 
 function formatTimeControl(tc: string): string {
-  const [base] = tc.split('+');
-  const mins = Math.floor(parseInt(base) / 60);
-  const bonus = tc.includes('+') ? tc.split('+')[1] : '0';
-  return `${mins}+${bonus}`;
+  const secs = parseInt(tc.split('+')[0]);
+  const inc = tc.includes('+') ? tc.split('+')[1] : '0';
+  return `${Math.floor(secs / 60)}+${inc}`;
 }
 
 export default function GameList({ games, username, onSelect }: Props) {
@@ -42,19 +43,35 @@ export default function GameList({ games, username, onSelect }: Props) {
           <button
             key={i}
             onClick={() => onSelect(game)}
-            className="w-full text-left bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700 hover:border-slate-500 rounded-lg px-4 py-3 transition-all"
+            className="card w-full text-left px-4 py-3 transition-all duration-150"
+            style={{ display: 'block' }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)';
+              (e.currentTarget as HTMLElement).style.background = 'rgba(40,24,10,0.92)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)';
+              (e.currentTarget as HTMLElement).style.background = 'rgba(30,18,8,0.82)';
+            }}
           >
             <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                 {resultBadge(me.result)}
-                <span className="text-slate-300 font-medium">{opp.username}</span>
-                <span className="text-slate-500 text-sm">({opp.rating})</span>
+                <span className="font-medium truncate" style={{ color: 'var(--text)' }}>
+                  {opp.username}
+                </span>
+                <span className="text-sm shrink-0" style={{ color: 'var(--muted)' }}>
+                  ({opp.rating})
+                </span>
               </div>
-              <div className="flex items-center gap-3 text-sm text-slate-500 shrink-0">
+              <div className="flex items-center gap-2 text-sm shrink-0" style={{ color: 'var(--muted)' }}>
                 <span>{formatTimeControl(game.time_control)}</span>
-                <span>{date}</span>
-                <span className="text-xs px-1.5 py-0.5 bg-slate-700 rounded">
-                  {isWhite ? '♙ White' : '♟ Black'}
+                <span className="hidden sm:inline">{date}</span>
+                <span
+                  className="text-xs px-1.5 py-0.5 rounded"
+                  style={{ background: 'var(--border2)', color: 'var(--accent)' }}
+                >
+                  {isWhite ? '♙ W' : '♟ B'}
                 </span>
               </div>
             </div>

@@ -1,49 +1,50 @@
 'use client';
 
-const MATE_SCORE = 10000;
-
 interface Props {
   score: number;
   mate: number | null;
-  orientation?: 'white' | 'black';
+  height: number;
 }
 
-function scoreToPercent(score: number, mate: number | null): number {
-  if (mate !== null) return mate > 0 ? 95 : 5;
-  const clamped = Math.max(-1000, Math.min(1000, score));
-  return 50 + (clamped / 1000) * 45;
+function scoreToPct(score: number, mate: number | null): number {
+  if (mate !== null) return mate > 0 ? 94 : 6;
+  return 50 + (Math.max(-900, Math.min(900, score)) / 900) * 43;
 }
 
-function formatEval(score: number, mate: number | null): string {
+function fmtEval(score: number, mate: number | null): string {
   if (mate !== null) return mate === 0 ? 'M0' : `M${Math.abs(mate)}`;
-  const pawns = score / 100;
-  return (pawns >= 0 ? '+' : '') + pawns.toFixed(1);
+  const p = score / 100;
+  return (p >= 0 ? '+' : '') + p.toFixed(1);
 }
 
-export default function EvalBar({ score, mate, orientation = 'white' }: Props) {
-  const whitePct = scoreToPercent(score, mate);
-  const label = formatEval(score, mate);
+export default function EvalBar({ score, mate, height }: Props) {
+  const whitePct = scoreToPct(score, mate);
   const isWhiteAhead = mate !== null ? mate > 0 : score >= 0;
+  const label = fmtEval(score, mate);
 
   return (
-    <div className="flex flex-col items-center gap-1 h-full">
-      <span className="text-xs text-slate-400 font-mono">{isWhiteAhead ? label : ''}</span>
+    <div className="flex flex-col items-center gap-1" style={{ height }}>
+      <span className="text-xs font-mono" style={{ color: 'var(--muted)', minHeight: 16 }}>
+        {isWhiteAhead ? label : ''}
+      </span>
       <div
-        className="relative w-5 rounded overflow-hidden border border-slate-700"
-        style={{ height: '100%', minHeight: 320 }}
+        className="relative w-4 rounded overflow-hidden flex-1"
+        style={{ border: '1px solid var(--border)' }}
       >
-        {/* Black portion (top) */}
+        {/* Black portion */}
         <div
-          className="absolute top-0 left-0 right-0 bg-slate-800 transition-all duration-300"
-          style={{ height: `${100 - whitePct}%` }}
+          className="absolute top-0 left-0 right-0 transition-all duration-300"
+          style={{ height: `${100 - whitePct}%`, background: '#1a0f06' }}
         />
-        {/* White portion (bottom) */}
+        {/* White portion */}
         <div
-          className="absolute bottom-0 left-0 right-0 bg-slate-100 transition-all duration-300"
-          style={{ height: `${whitePct}%` }}
+          className="absolute bottom-0 left-0 right-0 transition-all duration-300"
+          style={{ height: `${whitePct}%`, background: '#f5edd8' }}
         />
       </div>
-      <span className="text-xs text-slate-400 font-mono">{!isWhiteAhead ? label : ''}</span>
+      <span className="text-xs font-mono" style={{ color: 'var(--muted)', minHeight: 16 }}>
+        {!isWhiteAhead ? label : ''}
+      </span>
     </div>
   );
 }
