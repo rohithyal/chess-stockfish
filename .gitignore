@@ -24,3 +24,4 @@ next-env.d.ts
 # stockfish binaries (copied at build time)
 /public/stockfish.js
 /public/stockfish.wasm
+/public/*.nnue
