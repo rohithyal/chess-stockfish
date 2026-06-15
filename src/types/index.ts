@@ -19,7 +19,11 @@ export interface AnalyzedMove {
   mateBefore: number | null;
   mateAfter: number | null;
   classification: MoveClassification;
-  bestMove: string;
+  // Best move to play FROM the position before this move was played
+  bestMove: string;     // UCI "e2e4"
+  bestMoveSan: string;  // SAN "e4"
+  altMove: string;      // UCI second-best
+  altMoveSan: string;   // SAN second-best
 }
 
 export interface GameAnalysis {
