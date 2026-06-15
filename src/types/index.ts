@@ -8,6 +8,8 @@ export type MoveClassification =
   | 'blunder'
   | 'missed_win';
 
+export type GamePhase = 'opening' | 'middlegame' | 'endgame';
+
 export interface AnalyzedMove {
   san: string;
   fen: string;
@@ -19,22 +21,33 @@ export interface AnalyzedMove {
   mateBefore: number | null;
   mateAfter: number | null;
   classification: MoveClassification;
-  // Best move to play FROM the position before this move was played
-  bestMove: string;     // UCI "e2e4"
-  bestMoveSan: string;  // SAN "e4"
-  altMove: string;      // UCI second-best
-  altMoveSan: string;   // SAN second-best
+  accuracy: number;        // per-move accuracy 0-100
+  phase: GamePhase;
+  bestMove: string;        // UCI from position before this move
+  bestMoveSan: string;
+  altMove: string;
+  altMoveSan: string;
+}
+
+export interface PhaseAccuracy {
+  white: number;
+  black: number;
 }
 
 export interface GameAnalysis {
   white: string;
   black: string;
+  whiteRating?: number;
+  blackRating?: number;
   result: string;
   date: string;
   opening: string;
   moves: AnalyzedMove[];
   whiteAccuracy: number;
   blackAccuracy: number;
+  opening_acc: PhaseAccuracy;
+  middlegame_acc: PhaseAccuracy;
+  endgame_acc: PhaseAccuracy;
   pgn: string;
 }
 

@@ -14,19 +14,21 @@ import MoveInfoPanel from './MoveInfoPanel';
 
 const Chessboard = dynamic(() => import('react-chessboard').then((m) => m.Chessboard), {
   ssr: false,
-  loading: () => <div style={{ background: 'var(--surface)', borderRadius: 6, width: '100%', aspectRatio: '1' }} />,
+  loading: () => <div style={{ background: 'var(--surface)', borderRadius: 6, aspectRatio: '1', width: '100%' }} />,
 });
 
+// ── Board size hook ──────────────────────────────────────────────────────
 function useBoardSize(): number {
   const [size, setSize] = useState(360);
   useEffect(() => {
     const calc = () => {
       const w = window.innerWidth;
       const h = window.innerHeight;
-      if (w < 768) {
-        setSize(Math.max(200, Math.min(w - 32, Math.floor(h * 0.52))));
+      if (w < 1024) {
+        setSize(Math.max(240, Math.min(w - 32, Math.floor(h * 0.5))));
       } else {
-        setSize(Math.max(280, Math.min(480, Math.min(w - 384, h - 120))));
+        // Right panel ≈ 320px + gaps
+        setSize(Math.max(300, Math.min(500, Math.min(w - 380, h - 140))));
       }
     };
     calc();
@@ -36,19 +38,24 @@ function useBoardSize(): number {
   return size;
 }
 
-// Build board arrows for current position:
-// Green = best move to play, lighter blue = alternate
-function buildArrows(analysis: GameAnalysis, moveIndex: number) {
+// ── Board arrows ──────────────────────────────────────────────────────────
+function buildArrows(analysis: GameAnalysis, moveIndex: number): [Square, Square, string][] {
   const m = analysis.moves[moveIndex];
   if (!m) return [];
-  const arrows: [Square, Square, string][] = [];
-  if (m.bestMove && m.bestMove.length >= 4) {
-    arrows.push([m.bestMove.slice(0, 2) as Square, m.bestMove.slice(2, 4) as Square, 'rgba(80,220,100,0.85)']);
-  }
-  if (m.altMove && m.altMove.length >= 4 && m.altMove !== m.bestMove) {
-    arrows.push([m.altMove.slice(0, 2) as Square, m.altMove.slice(2, 4) as Square, 'rgba(80,160,240,0.55)']);
-  }
-  return arrows;
+  const out: [Square, Square, string][] = [];
+  if (m.bestMove?.length >= 4)
+    out.push([m.bestMove.slice(0,2) as Square, m.bestMove.slice(2,4) as Square, 'rgba(80,220,100,0.9)']);
+  if (m.altMove?.length >= 4 && m.altMove !== m.bestMove)
+    out.push([m.altMove.slice(0,2) as Square, m.altMove.slice(2,4) as Square, 'rgba(80,160,240,0.55)']);
+  return out;
+}
+
+// ── Result label ──────────────────────────────────────────────────────────
+function resultLabel(result: string, forWhite: boolean) {
+  if (result === '1-0') return forWhite ? '1' : '0';
+  if (result === '0-1') return forWhite ? '0' : '1';
+  if (result === '1/2-1/2') return '½';
+  return '';
 }
 
 interface Props {
@@ -57,29 +64,24 @@ interface Props {
 }
 
 export default function GameAnalyzer({ pgn, onBack }: Props) {
-  const boardSize = useBoardSize();
+  const boardSize   = useBoardSize();
   const [analysis, setAnalysis] = useState<GameAnalysis | null>(null);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError]       = useState<string | null>(null);
   const [moveIndex, setMoveIndex] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    setAnalysis(null);
-    setError(null);
-    setMoveIndex(0);
-    analyzePgn(pgn, 15, (done, total) => {
-      if (!cancelled) setProgress({ done, total });
-    })
-      .then((r) => { if (!cancelled) { setAnalysis(r); setMoveIndex(r.moves.length); } })
-      .catch((e) => { if (!cancelled) setError(e.message); });
+    setAnalysis(null); setError(null); setMoveIndex(0);
+    analyzePgn(pgn, 15, (d, t) => { if (!cancelled) setProgress({ done: d, total: t }); })
+      .then(r => { if (!cancelled) { setAnalysis(r); setMoveIndex(r.moves.length); } })
+      .catch(e => { if (!cancelled) setError(e.message); });
     return () => { cancelled = true; };
   }, [pgn]);
 
-  const currentFen = useCallback((): string => {
-    if (!analysis || moveIndex === 0) return new Chess().fen();
-    return analysis.moves[moveIndex - 1].fen;
-  }, [analysis, moveIndex]);
+  const currentFen = useCallback((): string =>
+    !analysis || moveIndex === 0 ? new Chess().fen() : analysis.moves[moveIndex - 1].fen,
+  [analysis, moveIndex]);
 
   const currentEval = () => {
     if (!analysis) return { score: 0, mate: null as number | null };
@@ -89,7 +91,7 @@ export default function GameAnalyzer({ pgn, onBack }: Props) {
   };
 
   const nav = useCallback((dir: 'first' | 'prev' | 'next' | 'last') =>
-    setMoveIndex((i) => {
+    setMoveIndex(i => {
       if (!analysis) return i;
       const max = analysis.moves.length;
       if (dir === 'first') return 0;
@@ -107,32 +109,36 @@ export default function GameAnalyzer({ pgn, onBack }: Props) {
     return () => window.removeEventListener('keydown', h);
   }, [nav]);
 
-  const ev = currentEval();
-
-  // The move that was just played (shown in info panel)
+  const ev       = currentEval();
   const lastMove = analysis && moveIndex > 0 ? analysis.moves[moveIndex - 1] : null;
-  const playedWasBest = lastMove
-    ? lastMove.bestMove === '' || lastMove.san === lastMove.bestMoveSan
-    : false;
+  const playedWasBest = !lastMove || lastMove.san === lastMove.bestMoveSan || !lastMove.bestMoveSan;
+  const arrows   = useMemo(() => analysis ? buildArrows(analysis, moveIndex) : [], [analysis, moveIndex]);
 
-  // Arrows for the CURRENT position (what to play from here)
-  const arrows = useMemo(
-    () => (analysis ? buildArrows(analysis, moveIndex) : []),
-    [analysis, moveIndex]
+  const navBtn = { background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' };
+
+  // Player name row
+  const PlayerRow = ({ name, rating, isWhite }: { name: string; rating?: number; isWhite: boolean }) => (
+    <div className="flex items-center gap-2 px-1 py-1.5 text-sm">
+      <div className="w-5 h-5 rounded flex items-center justify-center text-xs font-bold shrink-0"
+        style={{ background: isWhite ? '#f5edd8' : '#1a0a02', color: isWhite ? '#1a0a02' : '#f5edd8', border: '1px solid var(--border)' }}>
+        {isWhite ? '♙' : '♟'}
+      </div>
+      <span className="font-semibold truncate" style={{ color: 'var(--text)' }}>{name}</span>
+      {rating && <span className="text-xs shrink-0" style={{ color: 'var(--muted)' }}>({rating})</span>}
+      <span className="ml-auto text-xs shrink-0" style={{ color: 'var(--muted)' }}>
+        {analysis ? resultLabel(analysis.result, isWhite) : ''}
+      </span>
+    </div>
   );
 
-  const navBtnStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' };
-
   return (
-    <div className="min-h-screen p-3 md:p-5">
-      <button
-        onClick={onBack}
-        className="mb-4 flex items-center gap-1 text-sm"
+    <div className="min-h-screen p-3 md:p-4">
+      {/* Back */}
+      <button onClick={onBack} className="mb-3 flex items-center gap-1 text-sm"
         style={{ color: 'var(--muted)' }}
-        onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text)')}
-        onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--muted)')}
-      >
-        <ChevronLeft size={16} /> Back to games
+        onMouseEnter={e => (e.currentTarget.style.color = 'var(--text)')}
+        onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}>
+        <ChevronLeft size={15} /> Back to games
       </button>
 
       {error && (
@@ -143,16 +149,14 @@ export default function GameAnalyzer({ pgn, onBack }: Props) {
       )}
 
       {!analysis && !error && (
-        <div className="flex flex-col items-center justify-center gap-4 py-20">
-          <Loader2 size={40} className="animate-spin" style={{ color: 'var(--accent)' }} />
+        <div className="flex flex-col items-center justify-center gap-4 py-16">
+          <Loader2 size={36} className="animate-spin" style={{ color: 'var(--accent)' }} />
           <p style={{ color: 'var(--text)' }}>
             Analyzing with Stockfish…{' '}
-            {progress.total > 0 && (
-              <span style={{ color: 'var(--accent2)' }}>{progress.done}/{progress.total}</span>
-            )}
+            {progress.total > 0 && <span style={{ color: 'var(--accent2)' }}>{progress.done}/{progress.total}</span>}
           </p>
-          <div className="w-64 rounded-full h-2 overflow-hidden" style={{ background: 'var(--surface2)' }}>
-            <div className="h-2 rounded-full transition-all duration-300"
+          <div className="w-56 rounded-full h-1.5 overflow-hidden" style={{ background: 'var(--surface2)' }}>
+            <div className="h-full rounded-full transition-all"
               style={{ width: progress.total > 0 ? `${(progress.done / progress.total) * 100}%` : '0%', background: 'var(--accent)' }} />
           </div>
         </div>
@@ -160,65 +164,73 @@ export default function GameAnalyzer({ pgn, onBack }: Props) {
 
       {analysis && (
         <div className="flex flex-col lg:flex-row gap-4 items-start justify-center">
-          {/* Board + eval bar */}
-          <div className="flex gap-2 items-center w-full lg:w-auto justify-center">
-            <EvalBar score={ev.score} mate={ev.mate} height={boardSize} />
 
-            <div style={{ width: boardSize }}>
-              <div className="mb-1.5 text-center text-xs" style={{ color: 'var(--muted)' }}>
-                <span style={{ color: 'var(--text)' }}>{analysis.black}</span>
-                <span className="mx-1.5">vs</span>
-                <span style={{ color: 'var(--text)' }}>{analysis.white}</span>
-                {analysis.date && <span className="ml-1.5">· {analysis.date}</span>}
-              </div>
-
-              <Chessboard
-                position={currentFen()}
-                boardWidth={boardSize}
-                areArrowsAllowed={false}
-                customArrows={arrows}
-                customBoardStyle={{ borderRadius: 6, boxShadow: '0 4px 24px rgba(0,0,0,0.5)' }}
-                customDarkSquareStyle={{ backgroundColor: '#7a3a10' }}
-                customLightSquareStyle={{ backgroundColor: '#f5edd8' }}
-              />
-
-              {/* Nav controls */}
-              <div className="flex justify-center gap-2 mt-3">
-                {(['first', 'prev', 'next', 'last'] as const).map((dir) => (
-                  <button key={dir} onClick={() => nav(dir)}
-                    className="p-2 rounded hover:opacity-80 transition-opacity" style={navBtnStyle}>
-                    {dir === 'first' && <ChevronsLeft size={16} />}
-                    {dir === 'prev'  && <ChevronLeft  size={16} />}
-                    {dir === 'next'  && <ChevronRight size={16} />}
-                    {dir === 'last'  && <ChevronsRight size={16} />}
-                  </button>
-                ))}
-              </div>
-              <p className="text-center text-xs mt-1.5" style={{ color: 'var(--muted)' }}>
-                ← → arrow keys to navigate
-              </p>
+          {/* ── LEFT: Board area ── */}
+          <div className="w-full lg:w-auto flex flex-col items-center">
+            {/* Black player (top) */}
+            <div style={{ width: boardSize + 28 }}>
+              <PlayerRow name={analysis.black} rating={analysis.blackRating} isWhite={false} />
             </div>
+
+            {/* Eval bar + board */}
+            <div className="flex gap-2 items-stretch">
+              <EvalBar score={ev.score} mate={ev.mate} height={boardSize} />
+              <div>
+                <Chessboard
+                  position={currentFen()}
+                  boardWidth={boardSize}
+                  areArrowsAllowed={false}
+                  customArrows={arrows}
+                  customBoardStyle={{ borderRadius: 6, boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}
+                  customDarkSquareStyle={{ backgroundColor: '#7a3a10' }}
+                  customLightSquareStyle={{ backgroundColor: '#f5edd8' }}
+                />
+              </div>
+            </div>
+
+            {/* White player (bottom) */}
+            <div style={{ width: boardSize + 28 }}>
+              <PlayerRow name={analysis.white} rating={analysis.whiteRating} isWhite={true} />
+            </div>
+
+            {/* Nav controls */}
+            <div className="flex gap-2 mt-2">
+              {(['first','prev','next','last'] as const).map(dir => (
+                <button key={dir} onClick={() => nav(dir)}
+                  className="p-2 rounded hover:opacity-75 transition-opacity" style={navBtn}>
+                  {dir === 'first' && <ChevronsLeft  size={15} />}
+                  {dir === 'prev'  && <ChevronLeft   size={15} />}
+                  {dir === 'next'  && <ChevronRight  size={15} />}
+                  {dir === 'last'  && <ChevronsRight size={15} />}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>← → keys to navigate</p>
           </div>
 
-          {/* Sidebar */}
-          <div className="flex flex-col gap-3 w-full lg:w-72">
-            <div className="card px-3 py-2 text-xs" style={{ color: 'var(--muted)' }}>
-              {analysis.opening}
-            </div>
+          {/* ── RIGHT: Analysis panel ── */}
+          <div className="flex flex-col gap-3 w-full lg:w-80 shrink-0">
 
-            {/* Move info: best vs played */}
-            <MoveInfoPanel move={lastMove} playedWasBest={playedWasBest} />
-
+            {/* 1. Accuracy + phases + move counts */}
             <AccuracyCard analysis={analysis} />
 
-            {/* Move list */}
-            <div className="card flex flex-col overflow-hidden" style={{ flex: 1, minHeight: 0, maxHeight: 260 }}>
+            {/* 2. Opening */}
+            <div className="card px-3 py-2 text-xs" style={{ color: 'var(--muted)' }}>
+              <span style={{ color: 'var(--accent)' }}>♟ </span>{analysis.opening}
+            </div>
+
+            {/* 3. Move list */}
+            <div className="card flex flex-col overflow-hidden" style={{ minHeight: 0, maxHeight: 260 }}>
               <div className="px-3 py-1.5 text-xs flex justify-between"
                 style={{ borderBottom: '1px solid var(--border)', color: 'var(--muted)' }}>
-                <span>White</span><span>Move</span><span>Black</span>
+                <span>White</span><span>#</span><span>Black</span>
               </div>
               <MoveList moves={analysis.moves} currentIndex={moveIndex} onSelect={setMoveIndex} />
             </div>
+
+            {/* 4. Current move analysis */}
+            <MoveInfoPanel move={lastMove} playedWasBest={playedWasBest} />
+
           </div>
         </div>
       )}
